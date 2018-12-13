@@ -177,7 +177,12 @@ Resources:
           phases:
             install:
               commands:
-                - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay& - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
+                - mkdir bin
+                - curl -sS -o bin/aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-07-26/bin/linux/amd64/aws-iam-authenticator
+                - curl -sS -o bin/kubectl https://amazon-eks.s3-us-west-2.amazonaws.com/1.10.3/2018-07-26/bin/linux/amd64/kubectl
+                - chmod +x ./bin/kubectl ./bin/aws-iam-authenticator
+                - export PATH=$PWD/bin:$PATH
+                - apt-get update && apt-get -y install jq golang python3-pip python3-dev && pip3 install --upgrade awscli
             pre_build:
                 commands:
                   - TAG="$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | head -c 8)"
@@ -205,7 +210,7 @@ Resources:
             files: build.json
       Environment:
         ComputeType: "BUILD_GENERAL1_SMALL"
-        Image: "leonelmorais/bancolombia-aws-codebuild"
+        Image: "aws/codebuild/docker:1.12.1"
         Type: "LINUX_CONTAINER"
         EnvironmentVariables:
           - Name: REPOSITORY_URI
