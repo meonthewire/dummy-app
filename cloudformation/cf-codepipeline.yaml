@@ -163,28 +163,6 @@ Resources:
                   - ecr:UploadLayerPart
                   - ecr:CompleteLayerUpload
 
-  KubectlRoleName:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Principal:
-              AWS:
-              - !Sub arn:aws:iam::${AWS::AccountId}:root
-            Action:
-            - sts:AssumeRole
-        Policies:
-          - PolicyName: codebuild-kubectl-policy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - eks:Describe*
-                  Resource: "*"
-
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -199,7 +177,7 @@ Resources:
           phases:
             install:
               commands:
-                - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay& - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
+                - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay& - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
             pre_build:
                 commands:
                   - TAG="$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | head -c 8)"
@@ -211,10 +189,10 @@ Resources:
                 - echo Building the Docker image...
                 - docker build -t $REPOSITORY_URI:latest .
                 - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$TAG
+                - docker push $REPOSITORY_URI:$TAG
 
             post_build:
               commands:
-                - docker push $REPOSITORY_URI:$TAG
                 - CREDENTIALS=$(aws sts assume-role --role-arn $EKS_KUBECTL_ROLE_ARN --role-session-name codebuild-kubectl --duration-seconds 900)
                 - export AWS_ACCESS_KEY_ID="$(echo ${CREDENTIALS} | jq -r '.Credentials.AccessKeyId')"
                 - export AWS_SECRET_ACCESS_KEY="$(echo ${CREDENTIALS} | jq -r '.Credentials.SecretAccessKey')"
@@ -235,7 +213,9 @@ Resources:
           - Name: EKS_CLUSTER_NAME
             Value: !Ref ClusterName
           - Name: EKS_KUBECTL_ROLE_ARN
-            Value: !Sub arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
+            Value:
+              Fn::ImportValue:
+                !Sub "${ClusterName}-master-role"
       Name: !Ref AWS::StackName
       ServiceRole: !Ref CodeBuildServiceRole
 
