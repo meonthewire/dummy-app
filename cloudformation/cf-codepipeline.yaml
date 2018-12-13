@@ -266,7 +266,7 @@ Resources:
               OutputArtifacts:
                 - Name: App
               RunOrder: 1
-        - Name: Build and Deploy
+        - Name: BuildAndDeploy
           Actions:
             - Name: Build
               ActionTypeId:
